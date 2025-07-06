@@ -2,9 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Comment;
 use App\Entity\MicroPost;
+use App\Form\CommentTypeForm;
 use App\Form\MicroPostTypeForm;
+use App\Repository\CommentRepository;
 use App\Repository\MicroPostRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,7 +20,7 @@ class MicroPostController extends AbstractController
     public function index(MicroPostRepository $posts): Response
     {
         return $this->render('micro_post/index.html.twig', [
-            'posts' => $posts->findAll(),
+            'posts' => $posts->findAllWithComments(),
         ]);
     }
 
@@ -55,7 +59,7 @@ class MicroPostController extends AbstractController
     }
 
   #[Route('/micro-post/{post}/edit', name: 'app_micro_post_edit')]
-  public function edit(MicroPost $post,Request $request, MicroPostRepository $posts): Response
+  public function edit(MicroPost $post, Request $request, MicroPostRepository $posts): Response
   {
     $form = $this->createForm(MicroPostTypeForm::class, $post);
 
@@ -74,8 +78,37 @@ class MicroPostController extends AbstractController
     return $this->render(
       'micro_post/edit.html.twig',
       [
-        'form' => $form
+        'form' => $form,
+        'post' => $post
       ]
     );
   }
+
+    #[Route('/micro-post/{post}/comment', name: 'app_micro_post_comment')]
+    public function addComment(MicroPost $post, Request $request, CommentRepository $comments, EntityManagerInterface $entityManager): Response
+    {
+        $form = $this->createForm(CommentTypeForm::class, new Comment());
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid())
+        {
+            $comment = $form->getData();
+            $comment->setPost($post);
+            $entityManager->persist($comment);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Your comment have been added');
+
+            return $this->redirectToRoute('app_micro_post_show', ['post' => $post->getId()]);
+        }
+
+        return $this->render(
+            'micro_post/comment.html.twig',
+            [
+                'form' => $form,
+                'post' => $post
+            ]
+        );
+    }
 }
